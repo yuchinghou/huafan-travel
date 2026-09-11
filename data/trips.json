@@ -1,0 +1,189 @@
+{
+  "site": {
+    "brand": "花番國際旅行社 HuaFan Travel",
+    "orderEmail": "service@huafan.travel",
+    "note": "orderEmail 改成你們收訂單的信箱；本檔由「上架小工具」自動維護，也可手動編輯"
+  },
+  "trips": [
+    {
+      "id": "jp-hk",
+      "region": "日本",
+      "title": "東京・箱根溫泉 5日",
+      "days": "5天4夜",
+      "price": "NT$ 32,800",
+      "tags": [
+        "富士山",
+        "溫泉",
+        "購物"
+      ],
+      "img": "",
+      "grad": "linear-gradient(135deg,#c0392b,#8e2a3f)",
+      "desc": "築地市場、箱根海盜船、大涌谷溫泉，含自選一日自由活動。"
+    },
+    {
+      "id": "jp-ok",
+      "region": "日本",
+      "title": "北海道富良野盛夏 6日",
+      "days": "6天5夜",
+      "price": "NT$ 45,900",
+      "tags": [
+        "薰衣草",
+        "美食",
+        "天然景"
+      ],
+      "img": "",
+      "grad": "linear-gradient(135deg,#6a89cc,#4a5b8c)",
+      "desc": "富田農場花田、四季彩之丘、小樽運河，夏季限定班機。"
+    },
+    {
+      "id": "kr-sel",
+      "region": "韓國",
+      "title": "首爾風情 4日",
+      "days": "4天3夜",
+      "price": "NT$ 18,800",
+      "tags": [
+        "韓流",
+        "美妝",
+        "小吃"
+      ],
+      "img": "",
+      "grad": "linear-gradient(135deg,#5f9ea0,#3b6f70)",
+      "desc": "景福宮韓服體驗、明洞美妝、北村八景與深夜小吃行程。"
+    },
+    {
+      "id": "vn-dn",
+      "region": "東南亞",
+      "title": "峴港・會安古城 5日",
+      "days": "5天4夜",
+      "price": "NT$ 21,500",
+      "tags": [
+        "海島",
+        "古城",
+        "高CP"
+      ],
+      "img": "",
+      "grad": "linear-gradient(135deg,#16a085,#0e6655)",
+      "desc": "美溪沙灘、巴拿山黃金大橋、會安燈籠夜遊，含升龍水上劇場。"
+    },
+    {
+      "id": "th-bkk",
+      "region": "東南亞",
+      "title": "曼谷・大城 5日",
+      "days": "5天4夜",
+      "price": "NT$ 16,900",
+      "tags": [
+        "廟宇",
+        "市集",
+        "按摩"
+      ],
+      "img": "",
+      "grad": "linear-gradient(135deg,#e67e22,#b35410)",
+      "desc": "大皇宮、鄭王廟、丹嫩莎朵水上市場與周末夜市。"
+    },
+    {
+      "id": "ph-cbu",
+      "region": "東南亞",
+      "title": "宿霧親子海島 5日",
+      "days": "5天4夜",
+      "price": "NT$ 19,800",
+      "tags": [
+        "浮潛",
+        "親子",
+        "度假"
+      ],
+      "img": "",
+      "grad": "linear-gradient(135deg,#2e86de,#1b4f8a)",
+      "desc": "OSLOB 鯨鯊共游、水都瀑布、度假城堡含兒童方案。"
+    },
+    {
+      "id": "fr-eu",
+      "region": "歐洲",
+      "title": "法國・瑞士經典 8日",
+      "days": "8天6夜",
+      "price": "NT$ 89,000",
+      "tags": [
+        "艾菲爾鐵塔",
+        "少女峯",
+        "紅酒"
+      ],
+      "img": "",
+      "grad": "linear-gradient(135deg,#5d6d7e,#2c3e50)",
+      "desc": "巴黎三景、塞納河遊船、因特拉肯少女峯、格呂耶爾起司故鄉。"
+    },
+    {
+      "id": "it-eu",
+      "region": "歐洲",
+      "title": "義德捷三角浪漫 9日",
+      "days": "9天7夜",
+      "price": "NT$ 96,800",
+      "tags": [
+        "羅馬",
+        "新天鵝堡",
+        "布拉格"
+      ],
+      "img": "",
+      "grad": "linear-gradient(135deg,#984b4b,#5b2c2c)",
+      "desc": "羅馬鬥獸場、佛羅倫斯、新天鵝堡與布拉格黃昏徒步。"
+    },
+    {
+      "id": "au-syd",
+      "region": "大洋洲",
+      "title": "悉尼・墨爾本 8日",
+      "days": "8天6夜",
+      "price": "NT$ 72,000",
+      "tags": [
+        "歌劇院",
+        "大洋路",
+        "咖啡"
+      ],
+      "img": "",
+      "grad": "linear-gradient(135deg,#f39c12,#c87f0a)",
+      "desc": "歌劇院後台導覽、藍山國家公園、大洋路十二使徒岩。"
+    },
+    {
+      "id": "us-west",
+      "region": "美加",
+      "title": "美西環太平洋 8日",
+      "days": "8天6夜",
+      "price": "NT$ 78,000",
+      "tags": [
+        "大峽谷",
+        "拉斯維加斯",
+        "LA"
+      ],
+      "img": "",
+      "grad": "linear-gradient(135deg,#cb4335,#7d2418)",
+      "desc": "洛杉磯好萊塢、大峽谷南緣夜宿、維加斯秀場、舊金山金門橋。"
+    },
+    {
+      "id": "jp-hok",
+      "region": "日本",
+      "title": "沖繩藍洞自駕 4日",
+      "days": "4天3夜",
+      "price": "NT$ 23,600",
+      "tags": [
+        "自由行",
+        "自駕",
+        "潛水"
+      ],
+      "img": "",
+      "grad": "linear-gradient(135deg,#2196f3,#0d47a1)",
+      "desc": "本部藍洞浮潛、美麗海水族館，含租車與行程客製的自由行方案。"
+    },
+    {
+      "id": "sg-my",
+      "region": "東南亞",
+      "title": "新加坡・柔佛雙城 5日",
+      "days": "5天4夜",
+      "price": "NT$ 20,800",
+      "tags": [
+        "樂園",
+        "城市",
+        "美食"
+      ],
+      "img": "",
+      "grad": "linear-gradient(135deg,#27ae60,#145a32)",
+      "desc": "環球影城、濱海灣花園、LEGOLAND 與老巴剎小吃巡禮。"
+    }
+  ]
+}

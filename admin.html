@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>花番旅遊｜上架後台</title>
+<link rel="icon" type="image/svg+xml" href="../assets/logo-mark.svg">
+<style>
+  :root{--ink:#0f4c5c;--accent:#e07a3f;--mut:#4d6472;--bg:#f7f4ee}
+  *{box-sizing:border-box}
+  body{font-family:'Microsoft JhengHei',system-ui,sans-serif;background:var(--bg);color:var(--ink);margin:0;padding:24px;max-width:980px;margin-inline:auto}
+  h1{font-size:20px} h2{font-size:15px;color:var(--ink);margin:18px 0 8px}
+  .sec{background:#fff;border-radius:10px;padding:16px;margin:14px 0;box-shadow:0 1px 4px #0001}
+  .row{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:8px 0}
+  label{font-size:12px;color:var(--mut);display:block;margin-bottom:2px}
+  input,textarea,select{padding:8px;border:1px solid #ddd;border-radius:6px;font-size:14px;width:100%;font-family:inherit}
+  textarea{min-height:44px}
+  button{padding:10px 18px;border:none;border-radius:8px;background:var(--accent);color:#fff;font-size:14px;cursor:pointer}
+  button.gray{background:var(--mut)} button.small{padding:4px 10px;font-size:12px}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{padding:8px 10px;border-bottom:1px solid #eee;text-align:left}
+  th{color:#fff;background:var(--ink)}
+  .msg{padding:10px;border-radius:8px;background:#dff0e3;color:#2e7d5b;display:none;margin:10px 0}
+  .err{background:#fbe3e0;color:#b3402f}
+  .hint{font-size:12px;color:var(--mut)}
+  @media(max-width:720px){.row{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+<h1>🐶 花番旅遊｜上架後台 <span class="hint">（只有持有此連結+你Token的人能改）</span></h1>
+
+<div class="sec" id="loginBox">
+  <h2 style="margin-top:0">第一次使用：連接你的 GitHub</h2>
+  <div class="row" style="grid-template-columns:1fr 1fr">
+    <div><label>GitHub 帳號（使用者名稱）</label><input id="inOwner" placeholder="your-name"></div>
+    <div><label>Repository 名稱</label><input id="inRepo" value="huafan-travel"></div>
+    <div><label>個人存取權杖（fine-grained PAT，只需本 repo 的 Contents: Read and write）</label><input id="inToken" type="password" placeholder="github_pat_..."></div>
+  </div>
+  <button onclick="connect()">連接並載入行程</button>
+  <span class="hint">Token 只存在這台電腦的瀏覽器裡，不會上傳別處。</span>
+</div>
+
+<div id="app" style="display:none">
+  <div class="sec">
+    <h2 style="margin-top:0">網站設定</h2>
+    <div class="row" style="grid-template-columns:1fr"><div>
+      <label>收單信箱 orderEmail（客戶報名信寄到這裡）</label><input id="inEmail">
+    </div></div>
+  </div>
+
+  <div class="sec">
+    <h2 id="formTitle">新增行程</h2>
+    <div class="row">
+      <div><label>行程名稱 *</label><input id="f_title" placeholder="東京・箱根溫泉 5日"></div>
+      <div><label>分區 *（篩選鈕自動生成）</label><input id="f_region" list="regions" placeholder="日本"><datalist id="regions"></datalist></div>
+      <div><label>天數</label><input id="f_days" placeholder="5天4夜"></div>
+      <div><label>價格（起／人）</label><input id="f_price" placeholder="NT$ 32,800"></div>
+      <div><label>標籤（逗號分隔）</label><input id="f_tags" placeholder="溫泉,購物"></div>
+      <div><label>封面圖檔名（放 img/ 資料夾，留空用漸層色）</label><input id="f_img" placeholder="tokyo.jpg"></div>
+      <div style="grid-column:1/-1"><label>行程說明</label><textarea id="f_desc"></textarea></div>
+    </div>
+    <input type="hidden" id="f_id">
+    <button onclick="stageSave()">✓ 存進清單</button>
+    <button class="gray" onclick="resetForm()">清空</button>
+  </div>
+
+  <div class="sec">
+    <h2>目前行程（編輯／下架後按下方發布）</h2>
+    <table><thead><tr><th>名稱</th><th>分區</th><th>天數</th><th>價格</th><th>操作</th></tr></thead>
+    <tbody id="list"></tbody></table>
+  </div>
+
+  <button style="font-size:16px;padding:14px 26px" onclick="publish()">🚀 發布到網站</button>
+  <button class="gray" onclick="location.reload()">放棄變更</button>
+  <span class="hint">發布＝把 trips.json 推回 GitHub，網站約 1 分鐘內自動更新。</span>
+  <div class="msg" id="msg">✅ 已發布！稍等約一分鐘重新整理網站即可看到。</div>
+</div>
+
+<script>
+const API = "https://api.github.com";
+let OWNER="", REPO="", TOKEN="", sha="", DATA={site:{},trips:[]}, dirty=[];
+
+function cfg(){ return {headers:{Authorization:"Bearer "+TOKEN, "Content-Type":"application/json"}}; }
+function esc(s){return (s==null?"":String(s)).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
+
+async function connect(){
+  OWNER=document.getElementById("inOwner").value.trim();
+  REPO=document.getElementById("inRepo").value.trim()||"huafan-travel";
+  TOKEN=document.getElementById("inToken").value.trim();
+  if(!OWNER||!TOKEN){alert("請填帳號與 Token");return}
+  try{
+    const r=await fetch(`${API}/repos/${OWNER}/${REPO}/contents/data/trips.json`,cfg());
+    if(!r.ok) throw new Error("讀不到 data/trips.json（"+r.status+"）請確認 repo 名稱與 Token 權限");
+    const j=await r.json(); sha=j.sha;
+    DATA=JSON.parse(decodeURIComponent(escape(atob(j.content.replace(/\n/g,"")))));
+    localStorage.setItem("hf_cfg",JSON.stringify({OWNER,REPO,TOKEN}));
+    boot();
+  }catch(e){alert("連接失敗："+e.message)}
+}
+function boot(){
+  document.getElementById("loginBox").style.display="none";
+  document.getElementById("app").style.display="";
+  document.getElementById("inEmail").value=DATA.site.orderEmail||"";
+  dirty=JSON.parse(JSON.stringify(DATA.trips));
+  renderList();
+}
+function renderList(){
+  document.getElementById("list").innerHTML=dirty.map((t,i)=>
+    `<tr><td>${esc(t.title)}</td><td>${esc(t.region)}</td><td>${esc(t.days)}</td><td>${esc(t.price)}</td>
+     <td><button class="small gray" onclick="edit(${i})">編輯</button> <button class="small" style="background:#b3402f" onclick="del(${i})">下架</button></td></tr>`).join("");
+  document.getElementById("regions").innerHTML=[...new Set(dirty.map(t=>t.region))].map(r=>`<option value="${esc(r)}">`).join("");
+}
+function edit(i){const t=dirty[i];
+  f_id.value=t.id;f_title.value=t.title;f_region.value=t.region;f_days.value=t.days;
+  f_price.value=t.price;f_tags.value=(t.tags||[]).join(",");f_img.value=t.img||"";f_desc.value=t.desc||"";
+  document.getElementById("formTitle").textContent="編輯行程："+t.title;}
+function del(i){if(confirm("下架「"+dirty[i].title+"」？（發布後才生效）")){dirty.splice(i,1);renderList()}}
+function resetForm(){f_id.value="";["f_title","f_region","f_days","f_price","f_tags","f_img","f_desc"].forEach(x=>document.getElementById(x).value="");document.getElementById("formTitle").textContent="新增行程";}
+function stageSave(){
+  if(!f_title.value||!f_region.value){alert("名稱與分區必填");return}
+  const id=f_id.value||("t"+Date.now().toString(36));
+  const trip={id,region:f_region.value,title:f_title.value,days:f_days.value,price:f_price.value,
+    tags:f_tags.value?f_tags.value.split(/[,，]/).map(s=>s.trim()).filter(Boolean):[],
+    img:f_img.value,grad:"linear-gradient(135deg,#16a085,#0e6655)",desc:f_desc.value};
+  const keepGrad=dirty.find(t=>t.id===id); if(keepGrad&&keepGrad.grad) trip.grad=keepGrad.grad;
+  const i=dirty.findIndex(t=>t.id===id);
+  if(i>=0)dirty[i]=trip;else dirty.push(trip);
+  resetForm();renderList();
+}
+async function publish(){
+  DATA.site.orderEmail=document.getElementById("inEmail").value.trim();
+  DATA.trips=dirty;
+  const body={message:"上架更新 "+new Date().toISOString().slice(0,16).replace("T"," "),
+    content:btoa(unescape(encodeURIComponent(JSON.stringify(DATA,null,2)+"\n"))),sha};
+  const r=await fetch(`${API}/repos/${OWNER}/${REPO}/contents/data/trips.json`,{method:"PUT",headers:cfg().headers,body:JSON.stringify(body)});
+  if(!r.ok){const e=await r.json();alert("發布失敗："+(e.message||r.status));return}
+  sha=(await r.json()).content.sha;
+  const m=document.getElementById("msg");m.className="msg";m.style.display="block";
+  setTimeout(()=>m.style.display="none",5000);
+}
+// 同電腦第二次進來：自動帶入
+const saved=localStorage.getItem("hf_cfg");
+if(saved){const c=JSON.parse(saved);inOwner.value=c.OWNER;inRepo.value=c.REPO;inToken.value=c.TOKEN;}
+</script>
+</body>
+</html>

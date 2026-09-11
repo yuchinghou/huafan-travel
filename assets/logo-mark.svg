@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- 花番旅遊 logo v5：番茄紅圓胖果身×定位針，星狀萼片，黑白米克斯狗臉（臉縮小、耳不破形） -->
+  <defs>
+    <clipPath id="face"><circle cx="32" cy="28" r="12.5"/></clipPath>
+  </defs>
+  <!-- 定位針×番茄主體：圓胖果身＋短寬尖嘴 -->
+  <path d="M19 41C24 50 28 55 32 61 36 55 40 50 45 41Z" fill="#D9382B"/>
+  <circle cx="32" cy="27" r="23" fill="#D9382B"/>
+  <!-- 果身左上亮面 -->
+  <ellipse cx="18" cy="14" rx="6.5" ry="3.6" fill="#E8574A" transform="rotate(-32 18 14)"/>
+  <!-- 番茄蒂：短梗＋張開星狀萼片 -->
+  <rect x="30.6" y="2" width="2.8" height="5" rx="1.4" fill="#3E6E30"/>
+  <g fill="#4E8A3C">
+    <path d="M32 8.5 36 6.5 44 9.5 36.5 12.5Z"/>
+    <path d="M32 8.5 28 6.5 20 9.5 27.5 12.5Z"/>
+    <path d="M32 8.5 35 12.5 33.5 18 30.5 12.5Z"/>
+    <circle cx="32" cy="9.5" r="2.2"/>
+  </g>
+  <!-- 白臉（縮小，保留一圈紅果身） -->
+  <circle cx="32" cy="28" r="12.5" fill="#fff"/>
+  <!-- 垂耳：貼臉外側、完全在紅身內，不咬破果形 -->
+  <g fill="#23272B">
+    <path d="M20.5 17.5c-4.4-.6-7 1.8-7.3 5.4-.3 3.6 1.7 6.4 4.5 6.4 2.4 0 4-2.1 4.4-4.9.4-3.2.3-5.6-.2-6.9Z"/>
+    <path d="M43.5 17.5c4.4-.6 7 1.8 7.3 5.4.3 3.6-1.7 6.4-4.5 6.4-2.4 0-4-2.1-4.4-4.9-.4-3.2-.3-5.6.2-6.9Z"/>
+  </g>
+  <g clip-path="url(#face)">
+    <!-- 左眼：米克斯經典黑眼罩斑＋白高光 -->
+    <circle cx="25.6" cy="25.6" r="3.5" fill="#23272B"/>
+    <circle cx="24.8" cy="24.8" r=".85" fill="#fff"/>
+    <!-- 右眼：與左眼等大 -->
+    <circle cx="38.4" cy="25.6" r="3.5" fill="#23272B"/>
+    <circle cx="37.6" cy="24.8" r=".85" fill="#fff"/>
+    <!-- 頰邊小花（往臉中心收，不觸紅圈邊界） -->
+    <g transform="translate(39 31.8) scale(.55)">
+      <g fill="#F6C453">
+        <ellipse cx="0" cy="-3" rx="1.9" ry="3"/>
+        <ellipse cx="0" cy="-3" rx="1.9" ry="3" transform="rotate(72)"/>
+        <ellipse cx="0" cy="-3" rx="1.9" ry="3" transform="rotate(144)"/>
+        <ellipse cx="0" cy="-3" rx="1.9" ry="3" transform="rotate(216)"/>
+        <ellipse cx="0" cy="-3" rx="1.9" ry="3" transform="rotate(288)"/>
+      </g>
+      <circle r="1.4" fill="#B35410"/>
+    </g>
+    <!-- 鼻頭與笑嘴 -->
+    <path d="M32 29.4c1.6 0 2.7.9 2.7 1.9 0 1-1.1 1.9-2.7 1.9s-2.7-.9-2.7-1.9c0-1 1.1-1.9 2.7-1.9Z" fill="#23272B"/>
+    <path d="M32 33.3v1M32 34.3c-1.4 1.7-3.3 1.9-4.5.8M32 34.3c1.4 1.7 3.3 1.9 4.5.8" stroke="#23272B" stroke-width="1.4" fill="none" stroke-linecap="round"/>
+  </g>
+</svg>
