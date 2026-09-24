@@ -92,7 +92,7 @@ function defaults(){
   return {
     version: 2,
     people: [{id:"p1",name:"Xanna"},{id:"p2",name:"Eric"}],
-    opening: { bank:0, stock:0 },
+    opening: { p1:{bank:0,stock:0}, p2:{bank:0,stock:0} },
     cats: {
       expense: ["一般支出","旅遊支出"],
       income:  ["薪資","獎金/現金"],
@@ -103,6 +103,19 @@ function defaults(){
     meta: {}
   };
 }
+function normOpening(d){
+  var o={}, src=d.opening||{};
+  (d.people||[]).forEach(function(p){
+    var e=src[p.id];
+    if(e&&typeof e==="object") o[p.id]={bank:+e.bank||0, stock:+e.stock||0};
+    else o[p.id]={bank:0, stock:0};
+  });
+  if(typeof src.bank==="number" && (src.bank||src.stock)){
+    var k=(d.people&&d.people[0]||{}).id;
+    if(k&&!o[k].bank&&!o[k].stock) o[k]={bank:+src.bank||0, stock:+src.stock||0};
+  }
+  return o;
+}
 function migrate(d){
   var base = defaults();
   d = d || {};
@@ -112,10 +125,13 @@ function migrate(d){
   return {
     version: 2,
     people: d.people,
-    opening: { bank:+((d.opening||{}).bank)||0, stock:+((d.opening||{}).stock)||0 },
+    opening: normOpening(d),
     cats: cats,
     budgets: d.budgets||{},
-    txns: Array.isArray(d.txns)?d.txns:[],
+    txns: (Array.isArray(d.txns)?d.txns:[]).map(function(t){
+      if(!t.tag) t.tag=normTag((t.note||"").indexOf("/")>=0 ? t.note.split("/")[0] : "");
+      return t;
+    }),
     meta: d.meta||{}
   };
 }
@@ -207,6 +223,34 @@ function pages_dash(){
   });
   if(!any) h+='<p class="mut" style="font-size:13px">本期沒有計入的支出。到「記帳」頁記一筆看看。</p>';
   h+='</div>';
+
+  /* 細項分類檢討（計入支出按 tag 聚合） */
+  var agg={}, aggTot=0;
+  list.forEach(function(t){
+    if(!(t.type==="expense"&&isCounted(t))) return;
+    var g=t.tag||"（未分類）";
+    if(!agg[g]) agg[g]={amt:0,n:0,p:{}};
+    agg[g].amt+=t.amount; agg[g].n++;
+    agg[g].p[t.person]=(agg[g].p[t.person]||0)+t.amount;
+    aggTot+=t.amount;
+  });
+  var keys=Object.keys(agg).sort(function(a,b){return agg[b].amt-agg[a].amt;});
+  h+='<div class="card"><h2>細項分類檢討（計入支出按細項拆解）</h2>';
+  if(!keys.length) h+='<p class="mut" style="font-size:13px">本期沒有可拆解的支出。</p>';
+  else{
+    h+='<table><tr><th>細項</th><th class="num">筆數</th><th class="num">金額</th><th class="num">佔比</th>';
+    S.people.forEach(function(p){ h+='<th class="num">'+esc(p.name)+'付</th>'; });
+    h+='<th style="width:26%"></th></tr>';
+    keys.forEach(function(k){
+      var a=agg[k], pct=aggTot?Math.round(a.amt/aggTot*100):0;
+      h+='<tr><td><b>'+esc(k)+'</b></td><td class="num">'+a.n+'</td><td class="num" style="font-weight:700">'+fmt(a.amt)+'</td><td class="num">'+pct+'%</td>';
+      S.people.forEach(function(p){ h+='<td class="num" class="mut">'+(a.p[p.id]?fmt(a.p[p.id]):"—")+'</td>'; });
+      h+='<td><div class="bar" style="margin:0"><i style="width:'+pct+'%"></i></div></td></tr>';
+    });
+    h+='<tr><td><b>合計</b></td><td class="num">'+list.filter(function(t){return t.type==="expense"&&isCounted(t);}).length+'</td><td class="num"><b>'+fmt(aggTot)+'</b></td><td colspan="'+(2+S.people.length)+'"></td><td></td></tr>';
+    h+='</table><p class="mut" style="font-size:12px;margin-top:8px">占比最高的細項就是檢討重點。記帳時「細項」留空會自動抓備註「／」前面的字。</p>';
+  }
+  h+='</div>';
   return h;
 }
 
@@ -220,7 +264,9 @@ function pages_entry(){
   h+='<div class="f"><label>付款人／收領人</label><div class="who" id="enWho">';
   S.people.forEach(function(p){ h+='<button type="button" data-id="'+p.id+'" class="'+(lastPerson===p.id?"on":"")+'" onclick="pickWho(this)">'+esc(p.name)+'</button>'; });
   h+='</div></div></div>';
-  h+='<div class="row"><div class="f"><label>備註</label><input id="enNote" placeholder="例：晚餐 / 訂閱 / 出國機酒"></div>';
+  var tagSet={}; S.txns.forEach(function(t){ if(t.tag) tagSet[t.tag]=1; });
+  h+='<div class="row"><div class="f"><label>細項分類（檢討用；打備註「飲食/午餐」會自動帶入）</label><input id="enTag" list="tagList" placeholder="例：飲食、交通、醫療"><datalist id="tagList">'+Object.keys(tagSet).sort().map(function(k){return '<option value="'+esc(k)+'">';}).join("")+'</datalist></div>';
+  h+='<div class="f"><label>備註</label><input id="enNote" placeholder="例：午餐 / 訂閱 / 出國機酒"></div>';
   h+='<div class="f" style="max-width:220px;display:flex;align-items:center;gap:8px;padding-top:18px"><input type="checkbox" id="enAA" style="width:20px;height:20px" '+(lastAA?"checked":"")+'><label for="enAA" style="margin:0">這筆應AA（'+(lastPerson?esc(personName(lastPerson)):"付款人")+'先墊，之後結算對半）</label></div></div>';
   h+='<button class="btn" onclick="submitTxn()">保存這筆</button>';
   h+='<div id="enMsg" style="display:inline-block;margin-left:12px;font-size:13px;color:var(--ok);font-weight:700"></div></div>';
@@ -231,6 +277,8 @@ function pages_entry(){
   h+='<button class="btn ghost" onclick="saveCats()">更新口徑</button> <span class="mut" style="font-size:12px">類別名稱也能在這裡改，改完立即生效。</span></div>';
   return h;
 }
+var TAG_ALIAS={"個人醫療":"醫療","車費":"交通","旅遊相關費用":"旅遊","收退款｜旅遊相關費用":"旅遊"};
+function normTag(s){ s=String(s||"").trim(); return TAG_ALIAS[s]||s; }
 var lastAA=false;
 function pickWho(btn){
   var bs=document.querySelectorAll("#enWho button");
@@ -268,25 +316,29 @@ function submitTxn(){
   lastAA=document.getElementById("enAA").checked;
   S.txns.unshift({id:"t"+Date.now()+"_"+Math.floor(Math.random()*1e4), date:date,
     type:document.getElementById("enType").value, cat:document.getElementById("enCat").value,
-    amount:amt, person:lastPerson, aa:lastAA, note:document.getElementById("enNote").value.trim()});
+    amount:amt, person:lastPerson, aa:lastAA,
+    tag:normTag(document.getElementById("enTag").value.trim() || (document.getElementById("enNote").value.indexOf("/")>=0?document.getElementById("enNote").value.split("/")[0]:"")),
+    note:document.getElementById("enNote").value.trim()});
   save();
   msg.textContent=CS.on()?"✔ 已保存，同步中…":"✔ 已保存"; msg.style.color="var(--ok)";
-  document.getElementById("enAmt").value=""; document.getElementById("enNote").value="";
+  document.getElementById("enAmt").value=""; document.getElementById("enNote").value=""; document.getElementById("enTag").value="";
 }
 
 function pages_list(){
   var h='<div class="card"><h2>明細（'+rangeLabel()+'）</h2><div class="row">';
   h+='<div class="f"><label>看哪個月</label><input type="month" value="'+viewMonth+'" onchange="viewMonth=this.value;render()"></div>';
   h+='<div class="f"><label>成員篩選</label><select id="fsP">'+filterOpts(S.people.map(function(p){return [p.id,p.name];}))+'</select></div>';
-  h+='<div class="f"><label>類別篩選</label><select id="fsC">'+filterOpts(S.cats.expense.concat(S.cats.income,S.cats.detail).map(function(c){return [c,c];}))+'</select></div></div>';
-  var fp=(document.getElementById("fsP")||{}).value||"", fc=(document.getElementById("fsC")||{}).value||"";
-  var list=txOfRange().filter(function(t){ return (!fp||t.person===fp)&&(!fc||t.cat===fc); });
-  h+='<table><tr><th>日期</th><th>類別</th><th class="num">金額</th><th>付款人</th><th>口徑</th><th>備註</th><th></th></tr>';
+  h+='<div class="f"><label>類別篩選</label><select id="fsC">'+filterOpts(S.cats.expense.concat(S.cats.income,S.cats.detail).map(function(c){return [c,c];}))+'</select></div>';
+  var tg={}; S.txns.forEach(function(t){ if(t.tag) tg[t.tag]=1; });
+  h+='<div class="f"><label>細項篩選</label><select id="fsT">'+filterOpts(Object.keys(tg).sort().map(function(k){return [k,k];}))+'</select></div></div>';
+  var fp=(document.getElementById("fsP")||{}).value||"", fc=(document.getElementById("fsC")||{}).value||"", ft=(document.getElementById("fsT")||{}).value||"";
+  var list=txOfRange().filter(function(t){ return (!fp||t.person===fp)&&(!fc||t.cat===fc)&&(!ft||t.tag===ft); });
+  h+='<table><tr><th>日期</th><th>類別</th><th class="num">金額</th><th>付款人</th><th>口徑</th><th>細項</th><th>備註</th><th></th></tr>';
   list.forEach(function(t){
     var tag=isCounted(t)?(t.type==="income"?'<span class="tag tg-in">計入收入</span>':'<span class="tag tg-out">計入支出</span>'):'<span class="tag tg-det">僅明細</span>';
-    h+='<tr><td>'+esc(t.date)+'</td><td>'+esc(t.cat)+'</td><td class="num">'+fmt(t.amount)+'</td><td><span class="tag tg-p">'+esc(personName(t.person))+'</span>'+(t.aa?' <span class="tag tg-aa">應AA・各分 '+fmt(t.amount/2)+'</span>':"")+'</td><td>'+tag+'</td><td class="mut" style="font-size:12px">'+esc(t.note)+'</td><td><button class="btn danger" style="padding:4px 10px;font-size:12px" onclick="delTxn(\''+t.id+'\')">刪</button></td></tr>';
+    h+='<tr><td>'+esc(t.date)+'</td><td>'+esc(t.cat)+'</td><td class="num">'+fmt(t.amount)+'</td><td><span class="tag tg-p">'+esc(personName(t.person))+'</span>'+(t.aa?' <span class="tag tg-aa">應AA・各分 '+fmt(t.amount/2)+'</span>':"")+'</td><td>'+tag+'</td><td>'+(t.tag?'<span class="tag" style="background:#eef1ff;color:#4a5fd0">'+esc(t.tag)+'</span>':'')+'</td><td class="mut" style="font-size:12px">'+esc(t.note)+'</td><td><button class="btn danger" style="padding:4px 10px;font-size:12px" onclick="delTxn(\''+t.id+'\')">刪</button></td></tr>';
   });
-  if(!list.length) h+='<tr><td colspan="7" class="mut" style="text-align:center;padding:20px">這期間還沒有資料</td></tr>';
+  if(!list.length) h+='<tr><td colspan="8" class="mut" style="text-align:center;padding:20px">這期間還沒有資料</td></tr>';
   h+='</table><p class="mut" style="font-size:12px;margin-top:10px">共 '+list.length+' 筆。「僅明細」的類別不影響任何總額，只為查帳清楚。</p></div>';
   return h;
 }
@@ -314,22 +366,37 @@ function pages_budget(){
 }
 
 function pages_asset(){
-  var inc=sumCounted(S.txns,"income"), exp=sumCounted(S.txns,"expense");
-  var h='<div class="card"><h2>開帳金額（初始值，隨時可改）</h2><div class="row">';
-  h+='<div class="f"><label>銀行存款（開帳）</label><input id="opBank" type="number" inputmode="decimal" value="'+(S.opening.bank||"")+'" placeholder="例：300000"></div>';
-  h+='<div class="f"><label>股票資產（開帳）</label><input id="opStock" type="number" inputmode="decimal" value="'+(S.opening.stock||"")+'" placeholder="例：500000"></div>';
-  h+='<div class="f" style="display:flex;align-items:flex-end"><button class="btn" onclick="saveOpen()">保存開帳金額</button></div>';
-  h+='</div><div class="note">銀行存款＝開帳金額＋實際收入－實際支出（自動推算）。股票直接填當前市值，看盤時更新數字就好。刷卡消費與轉帳不計入，不會重複算。</div></div>';
+  var h='<div class="card"><h2>開帳金額（初始值，分兩人，隨時可改）</h2>';
+  S.people.forEach(function(p){
+    var o=S.opening[p.id]||{bank:0,stock:0};
+    var mi=sumCounted(S.txns.filter(function(t){return t.person===p.id;}),"income");
+    var me=sumCounted(S.txns.filter(function(t){return t.person===p.id;}),"expense");
+    h+='<div class="row" style="margin-bottom:6px"><div class="f" style="max-width:130px;display:flex;align-items:center"><span class="tag tg-p">'+esc(p.name)+'</span></div>';
+    h+='<div class="f"><label>銀行存款（開帳）</label><input id="opBank_'+p.id+'" type="number" inputmode="decimal" value="'+(o.bank||"")+'" placeholder="例：300000"></div>';
+    h+='<div class="f"><label>股票資產（開帳）</label><input id="opStock_'+p.id+'" type="number" inputmode="decimal" value="'+(o.stock||"")+'" placeholder="例：500000"></div>';
+    h+='<div class="f" style="max-width:200px;display:flex;align-items:flex-end"><span class="mut" style="font-size:12px;line-height:1.6">目前推算：銀行 '+fmt(o.bank+mi-me)+'<br>本期收 '+fmt(mi)+'／支 '+fmt(me)+'</span></div>';
+    h+='</div>';
+  });
+  h+='<button class="btn" onclick="saveOpen()">保存開帳金額</button>';
+  h+='<div class="note" style="margin-top:10px">各自填自己的開帳銀行與股票。銀行存款＝自己的開帳＋自己的實際收入−實際支出（自動推算）。股票直接填當前市值，看盤時更新數字就好。刷卡消費與轉帳不計入，不會重複算。</div></div>';
+  var tb=0,ts=0;
   h+='<div class="kpiGrid">';
-  h+='<div class="kpi"><div class="mut" style="font-size:12px">銀行存款（推算）</div><div class="v">'+fmt(S.opening.bank+inc-exp)+'</div><div class="s">開帳 '+fmt(S.opening.bank)+'＋收 '+fmt(inc)+'－支 '+fmt(exp)+'</div></div>';
-  h+='<div class="kpi"><div class="mut" style="font-size:12px">股票資產</div><div class="v">'+fmt(S.opening.stock)+'</div><div class="s">手工填當前市值</div></div>';
-  h+='<div class="kpi"><div class="mut" style="font-size:12px">總資產</div><div class="v">'+fmt(S.opening.bank+inc-exp+S.opening.stock)+'</div><div class="s">全期間累計</div></div>';
+  S.people.forEach(function(p){
+    var o=S.opening[p.id]||{bank:0,stock:0};
+    var pt=S.txns.filter(function(t){return t.person===p.id;});
+    var bank=o.bank+sumCounted(pt,"income")-sumCounted(pt,"expense");
+    tb+=bank; ts+=o.stock;
+    h+='<div class="kpi"><div class="mut" style="font-size:12px">'+esc(p.name)+' 銀行（推算）</div><div class="v">'+fmt(bank)+'</div><div class="s">股票 '+fmt(o.stock)+'</div></div>';
+  });
+  h+='<div class="kpi"><div class="mut" style="font-size:12px">兩人總資產</div><div class="v">'+fmt(tb+ts)+'</div><div class="s">銀行 '+fmt(tb)+'＋股票 '+fmt(ts)+'（全期間）</div></div>';
   h+='</div>';
   return h;
 }
 function saveOpen(){
-  S.opening.bank=+document.getElementById("opBank").value||0;
-  S.opening.stock=+document.getElementById("opStock").value||0;
+  S.people.forEach(function(p){
+    var b=document.getElementById("opBank_"+p.id), s=document.getElementById("opStock_"+p.id);
+    S.opening[p.id]={bank:+((b||{}).value)||0, stock:+((s||{}).value)||0};
+  });
   save(); render();
 }
 
