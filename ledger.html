@@ -88,6 +88,8 @@ footer{text-align:center;font-size:12px;color:var(--mut);margin-top:26px;line-he
 var LS_KEY = "householdLedger.v2";
 
 /* ================= 資料結構 ================= */
+var TAG_ALIAS={"個人醫療":"醫療","車費":"交通","旅遊相關費用":"旅遊","收退款｜旅遊相關費用":"旅遊"};
+function normTag(s){ s=String(s||"").trim(); return TAG_ALIAS[s]||s; }
 function defaults(){
   return {
     version: 2,
@@ -277,8 +279,6 @@ function pages_entry(){
   h+='<button class="btn ghost" onclick="saveCats()">更新口徑</button> <span class="mut" style="font-size:12px">類別名稱也能在這裡改，改完立即生效。</span></div>';
   return h;
 }
-var TAG_ALIAS={"個人醫療":"醫療","車費":"交通","旅遊相關費用":"旅遊","收退款｜旅遊相關費用":"旅遊"};
-function normTag(s){ s=String(s||"").trim(); return TAG_ALIAS[s]||s; }
 var lastAA=false;
 function pickWho(btn){
   var bs=document.querySelectorAll("#enWho button");
