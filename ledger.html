@@ -206,99 +206,125 @@ function esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,
 /* ================= 分析儀表板 ================= */
 var PIE_COLORS=["#4a6cf7","#f2a93b","#e35d6a","#3aa675","#8a63d2","#2ab3c0","#d1495b","#7ab648","#c07c1c","#5566c8","#90959f"];
 function monthLabelOf(t){ return t.date.slice(0,7); }
+var rpMode="m", rpStart="", rpEnd="";
+function monthsBetween(a,b){
+  if(!a||!b){return [];}
+  if(a>b){var t=a;a=b;b=t;}
+  var out=[],y=+a.slice(0,4),m=+a.slice(5,7),ey=+b.slice(0,4),em=+b.slice(5,7);
+  while(y<ey||(y===ey&&m<=em)){ out.push(y+"-"+("0"+m).slice(-2)); m++; if(m>12){m=1;y++;} }
+  return out;
+}
+function rpRange(){
+  var mo=(document.getElementById("monthSel")||{}).value||viewMonth;
+  if(rpMode==="m")return [mo];
+  if(rpMode==="y"){var arr=[],y=mo.slice(0,4);for(var i2=1;i2<=12;i2++)arr.push(y+"-"+("0"+i2).slice(-2));return arr;}
+  return monthsBetween(rpStart||mo.slice(0,4)+"-01", rpEnd||mo);
+}
+function setRpMode(x){
+  var mo=(document.getElementById("monthSel")||{}).value||viewMonth;
+  if(x==="c"&&!rpStart){rpStart=mo.slice(0,4)+"-01";rpEnd=mo;}
+  rpMode=x; render();
+}
+function personSum(list,pid){
+  var inc=0,exp=0;
+  list.forEach(function(t){
+    if(t.p!==pid||!t.cat)return;
+    if(t.type==="income"&&S.cats.income.indexOf(t.cat)>=0)inc+=t.amount;
+    if(t.type==="expense"&&S.cats.expense.indexOf(t.cat)>=0)exp+=t.amount;
+  });
+  return {inc:inc,exp:exp};
+}
 function pages_report(){
-  var y=viewMonth.slice(0,4);
-  var yearTx=S.txns.filter(function(t){ return t.date.slice(0,4)===y; });
-  var inc=sumCounted(yearTx,"income"), exp=sumCounted(yearTx,"expense");
-  var saved=inc-exp, rate=exp/inc*100;
-  var goal=+((S.goal||{})[y])||0;
-  var h='<div class="card"><h2>'+y+' 存錢目標（當年度）</h2>';
-  h+='<div class="row"><div class="f" style="max-width:220px"><label>今年目標（元）</label><input id="goalAmt" type="number" inputmode="decimal" value="'+(goal||"")+'" placeholder="例：600000"></div>';
-  h+='<div class="f" style="max-width:160px;display:flex;align-items:flex-end"><button class="btn" onclick="saveGoal()">保存目標</button></div></div>';
-  var gpct=goal>0?Math.min(100,Math.round(saved/goal*100)):(saved>0?100:0);
-  h+='<div style="display:flex;justify-content:space-between;font-size:14px;margin-top:6px"><b>目前存下 '+fmt(Math.max(saved,0))+(goal?' / 目標 '+fmt(goal):'')+'</b><span style="font-weight:700;color:'+(goal&&saved>=goal?"var(--ok)":"var(--brand,#4a6cf7)")+'">'+(goal?(saved/goal*100).toFixed(1)+'%':'達標線未設')+'</span></div>';
-  h+='<div class="bar" style="height:14px"><i style="width:'+(goal>0?gpct:(saved>0?100:0))+'%"></i></div>';
-  if(goal>0&&saved>=goal) h+='<div class="note" style="color:var(--ok);font-weight:700">🎉 已達標！超儲 '+fmt(saved-goal)+' 元。</div>';
-  else if(goal>0) h+='<div class="note">還差 '+fmt(goal-saved)+' 元。以目前速度（本期 '+fmt(saved)+'），'+(saved>0?'照這速度年底':'今年還沒存到錢')+'。</div>';
+  var mo=(document.getElementById("monthSel")||{}).value||viewMonth;
+  var months=rpRange();
+  if(!months.length)months=[viewMonth];
+  var startM=months[0], endM=months[months.length-1];
+  var list=S.txns.filter(function(t){var m2=(t.date||"").slice(0,7);return m2>=startM&&m2<=endM;});
+  var nm=months.length;
+  var h='<div class="card"><h2>分析儀表板</h2><div class="row">';
+  h+='<div class="f" style="max-width:170px"><label>月份</label><input type="month" id="monthSel" value="'+mo+'" onchange="render()"></div>';
+  h+='<div class="btnRow" style="margin:0">';
+  [["m","單月"],["y","該年全年"],["c","自訂區間"]].forEach(function(md){
+    h+='<button class="chip'+(rpMode===md[0]?" on":"")+'" onclick="setRpMode(\''+md[0]+'\')">'+md[1]+'</button>';
+  });
+  h+='</div>';
+  if(rpMode==="c"){
+    h+='<div class="f" style="max-width:150px"><label>起</label><input type="month" value="'+rpStart+'" onchange="rpStart=this.value;render()"></div>';
+    h+='<div class="f" style="max-width:150px"><label>迄</label><input type="month" value="'+rpEnd+'" onchange="rpEnd=this.value;render()"></div>';
+  }
+  h+='</div>';
+  h+='<div class="note">目前檢視：'+startM+' ~ '+endM+'（'+nm+' 個月），期間共 '+list.length+' 筆。</div></div>';
+
+  h+='<div class="card"><h2>存錢目標（每人各設，每月目標）</h2>';
+  h+='<div class="note">存錢＝該人本期計入收入 − 該人本期計入支出。選單月就是當月目標，選多月自動變成「每月目標 × 月數」的總目標。</div>';
+  h+='<div class="kpiGrid">';
+  S.people.forEach(function(p){
+    var s=personSum(list,p.id);
+    var saved=s.inc-s.exp;
+    var per=+(((S.goal||{})[p.id])||0);
+    var goal=per*nm;
+    var pct=goal>0?Math.min(100,Math.round(saved/goal*100)):(saved>0?100:0);
+    var col=(goal<=0)?"var(--mut)":(saved>=goal?"var(--ok)":(saved>=goal*0.8?"#d97706":"var(--bad)"));
+    h+='<div class="kpi"><div class="mut" style="font-size:12px">'+esc(p.name)+' 存錢</div>';
+    h+='<div class="v" style="color:'+col+'">'+fmt(saved)+'</div>';
+    h+='<div class="s">'+(goal>0?("目標 "+fmt(goal)+"｜達成 "+pct+"%"+(saved<goal?("，還差 "+fmt(goal-saved)):"，達標 🎉")):"尚未設目標")+'</div>';
+    if(goal>0){h+='<div style="background:var(--line);height:8px;border-radius:99px;margin-top:6px"><div style="width:'+pct+'%;height:8px;border-radius:99px;background:'+col+'"></div></div>';}
+    h+='<div class="row" style="margin-top:8px"><input class="f" style="max-width:130px" type="number" id="goalAmt_'+p.id+'" placeholder="每月目標" value="'+(per||"")+'"><button class="chip" onclick="saveGoal(\''+p.id+'\')">設定</button></div>';
+    h+='</div>';
+  });
+  h+='</div>';
+  if(S.people.some(function(p){var s2=personSum(list,p.id);return s2.exp>s2.inc;})){
+    h+='<div class="note" style="color:var(--bad)">⚠️ 有人本期花費比收入多（負存錢），看下方大項分布找原因。</div>';
+  }
   h+='</div>';
 
-  /* 花費比 */
-  h+='<div class="card"><h2>年度花費比（'+y+'，支出÷收入）</h2>';
-  var badge=rate>50?'<span style="background:var(--bad);color:#fff;padding:4px 14px;border-radius:999px;font-weight:800;font-size:14px">⚠ 過線 50%</span>':'<span style="background:var(--ok);color:#fff;padding:4px 14px;border-radius:999px;font-weight:800;font-size:14px">✓ 健康</span>';
-  h+='<div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap"><div style="font-size:34px;font-weight:800;color:'+(rate>50?"var(--bad)":"var(--ok)")+'">'+(inc?rate.toFixed(1):'—')+'%</div>'+badge+'</div>';
-  h+='<div class="note">實際支出 '+fmt(exp)+' ÷ 實際收入 '+fmt(inc)+'。門檻 50%：超過就代表存錢速度被你放緩，該對前五大花費下手。</div></div>';
-
-  /* 圓餅圖: 計入支出按大項 */
-  var agg={}, aggT=0;
-  yearTx.forEach(function(t){
-    if(!(t.type==="expense"&&isCounted(t))) return;
-    var g=normTag(t.tag||"")||"（未分類）", top=g.split("/")[0];
-    agg[top]=(agg[top]||0)+t.amount; aggT+=t.amount;
+  h+='<div class="card"><h2>花費比（本期，每人）</h2>';
+  S.people.forEach(function(p){
+    var s=personSum(list,p.id);
+    if(s.inc<=0){ h+='<div class="row"><b>'+esc(p.name)+'</b><span class="mut">本期無計入收入，無法算比例</span></div>'; return; }
+    var r=s.exp/s.inc*100;
+    var warn=r>100?["🔴 超支","var(--bad)"]:(r>=80?["⚠️ 達 80%","#d97706"]:["🟢 健康","var(--ok)"]);
+    h+='<div class="row" style="justify-content:space-between"><span><b>'+esc(p.name)+'</b>　收入 '+fmt(s.inc)+' − 支出 '+fmt(s.exp)+'</span><span style="color:'+warn[1]+'"><b>'+r.toFixed(1)+'%　'+warn[0]+'</b></span></div>';
   });
-  var keys=Object.keys(agg).sort(function(a,b){return agg[b]-agg[a];});
-  h+='<div class="card"><h2>'+y+' 花費圓餅圖（計入支出，按大項）</h2>';
-  if(!keys.length){ h+='<p class="mut">今年還沒有計入的支出。</p></div>'; }
-  else{
-    var acc=0, paths="", legend="";
-    keys.forEach(function(k,i){
-      var a0=acc/aggT*2*Math.PI-Math.PI/2, a1=(acc+agg[k])/aggT*2*Math.PI-Math.PI/2;
-      var large=(acc+agg[k])/aggT>0.5?1:0;
-      var x0=100+80*Math.cos(a0), y0=100+80*Math.sin(a0), x1=100+80*Math.cos(a1), y1=100+80*Math.sin(a1);
-      var col=PIE_COLORS[i%PIE_COLORS.length];
-      paths+=(agg[k]===aggT)?'<circle cx="100" cy="100" r="80" fill="'+col+'"/>':'<path d="M100,100 L'+x0.toFixed(2)+','+y0.toFixed(2)+' A80,80 0 '+large+' 1 '+x1.toFixed(2)+','+y1.toFixed(2)+' Z" fill="'+col+'" stroke="#fff" stroke-width="2"/>';
-      acc+=agg[k];
-      legend+='<div style="display:flex;align-items:center;gap:8px;margin:4px 0"><span style="width:14px;height:14px;border-radius:4px;background:'+col+';flex:none"></span><b style="font-size:13px">'+esc(k)+'</b><span class="mut" style="font-size:13px;margin-left:auto">'+fmt(agg[k])+' · '+Math.round(agg[k]/aggT*100)+'%</span></div>';
-    });
-    h+='<div class="row" style="align-items:center"><svg viewBox="0 0 200 200" style="width:190px;height:190px;flex:none"><circle cx="100" cy="100" r="80" fill="none"/><g>'+paths+'</g><circle cx="100" cy="100" r="42" fill="var(--card,#fff)"/><text x="100" y="96" text-anchor="middle" font-size="13" font-weight="800" fill="var(--fg,#22262e)">'+fmt(aggT)+'</text><text x="100" y="114" text-anchor="middle" font-size="12" fill="var(--mut,#7b8494)">年度支出</text></svg><div style="flex:1;min-width:220px">'+legend+'</div></div></div>';
+  h+='<div class="note">口徑：支出＝一般支出＋旅遊支出；收入＝薪資＋獎金/現金。</div></div>';
 
-    /* 每月兩人分析 + 前五大 */
-    h+='<div class="card"><h2>逐月兩人分析（含前五大花費，細項口徑）</h2><div class="note">「前五大」看的是<b>實際計入的支出按大項細項拆</b>，刷卡與繳卡費只是資金軌跡、不重複計入。</div>';
-    var months={};
-    yearTx.forEach(function(t){ months[monthLabelOf(t)]=1; });
-    var mk=Object.keys(months).sort();
-    if(!mk.length) h+='<p class="mut">今年還沒有資料。</p>';
-    mk.forEach(function(m){
-      var mt=yearTx.filter(function(t){ return monthLabelOf(t)===m; });
-      h+='<div style="margin:18px 0 6px;display:flex;align-items:center;gap:10px;flex-wrap:wrap"><b style="font-size:16px">'+m.replace("-","/")+'</b>';
-      var mInc=sumCounted(mt,"income"), mExp=sumCounted(mt,"expense");
-      var mRate=mInc?mExp/mInc*100:999;
-      h+='<span class="mut">收 '+fmt(mInc)+' · 支 '+fmt(mExp)+' · 存 '+fmt(mInc-mExp)+'</span>';
-      if(mRate>50) h+='<span style="background:var(--bad);color:#fff;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:700">花費比 '+Math.round(mRate)+'% ⚠</span>';
-      h+='</div><div class="row" style="gap:12px">';
-      S.people.forEach(function(p){
-        var pt=mt.filter(function(t){ return t.person===p.id; });
-        var pi=sumCounted(pt,"income"), pe=sumCounted(pt,"expense");
-        var tAgg={}; pt.forEach(function(t){ if(t.type==="expense"&&isCounted(t)){ var g=normTag(t.tag||"")||"（未分類）"; var top=g.split("/")[0]; if(!tAgg[top])tAgg[top]={amt:0,subs:{}}; tAgg[top].amt+=t.amount; tAgg[top].subs[g]=(tAgg[top].subs[g]||0)+t.amount; }});
-        var tk=Object.keys(tAgg).sort(function(a,b){return tAgg[b].amt-tAgg[a].amt;}).slice(0,5);
-        var tips=[];
-        if(pe>pi) tips.push('本月入不敷出 '+fmt(pe-pi)+' 元，先蹲一下');
-        if(pi&&pe/pi>0.5) tips.push('花費比 '+Math.round(pe/pi*100)+'%，過半');
-        if(tk.length&&tAgg[tk[0]].amt/pe>0.4) tips.push('「'+tk[0]+'」一項佔你本月支出 '+Math.round(tAgg[tk[0]].amt/pe*100)+'%，過度集中');
-        if(!tips.length) tips.push('節奏健康，維持');
-        h+='<div style="flex:1;min-width:250px;background:var(--soft,#f6f7fb);border-radius:14px;padding:12px">';
-        h+='<div style="display:flex;justify-content:space-between;align-items:center"><span class="tag tg-p">'+esc(p.name)+'</span><span style="font-size:13px">支 '+fmt(pe)+' / 收 '+fmt(pi)+'</span></div>';
-        h+='<table style="margin-top:6px"><tr><th>#</th><th>大項（點細項）</th><th class="num">金額</th><th class="num">佔其支出</th></tr>';
-        if(!tk.length) h+='<tr><td colspan="4" class="mut" style="text-align:center">本月無計入支出</td></tr>';
-        tk.forEach(function(k,i){
-          var subs=Object.keys(tAgg[k].subs).sort(function(a,b){return tAgg[k].subs[b]-tAgg[k].subs[a];}).slice(0,3)
-            .map(function(s){ return s.indexOf("/")>=0?s.split("/")[1]:s; }).join("、");
-          h+='<tr><td>'+(i+1)+'</td><td><b>'+esc(k)+'</b><br><span class="mut" style="font-size:12px">'+esc(subs||"—")+'</span></td><td class="num" style="font-weight:700">'+fmt(tAgg[k].amt)+'</td><td class="num">'+(pe?Math.round(tAgg[k].amt/pe*100):0)+'%</td></tr>';
-        });
-        h+='</table><div class="note" style="margin-top:6px;font-size:13px">💡 '+esc(tips.join("；"))+'。</div></div>';
-      });
-      h+='</div>';
+  h+='<div class="card"><h2>本期大項分布（每人）</h2>';
+  S.people.forEach(function(p,pi){
+    var agg={};
+    list.forEach(function(t){
+      if(t.person!==p.id||t.type!=="expense"||S.cats.expense.indexOf(t.cat)<0)return;
+      var tg=(t.tag||"未分類").split("/")[0];
+      agg[tg]=(agg[tg]||0)+t.amount;
     });
-    h+='</div>';
-  }
+    var pairs=Object.keys(agg).map(function(k){return [k,agg[k]];}).sort(function(a,b){return b[1]-a[1];});
+    var tot=pairs.reduce(function(sm,x){return sm+x[1];},0);
+    h+='<h3 style="margin:10px 0 4px">'+esc(p.name)+'　合計 '+fmt(tot)+'</h3>';
+    if(!pairs.length){h+='<div class="mut" style="margin-bottom:8px">本期無計入支出</div>';return;}
+    var acc=0,stops=[];
+    pairs.forEach(function(pr,idx){
+      var a0=acc/tot*360; acc+=pr[1];
+      stops.push(PIE_COLORS[idx%PIE_COLORS.length]+" "+a0.toFixed(2)+"deg "+(acc/tot*360).toFixed(2)+"deg");
+    });
+    h+='<div class="row" style="align-items:center"><div style="width:130px;height:130px;border-radius:50%;flex:none;background:conic-gradient('+stops.join(",")+')"></div>';
+    h+='<div style="flex:1;min-width:200px">';
+    pairs.slice(0,6).forEach(function(pr,idx){
+      h+='<div class="row" style="justify-content:space-between;padding:2px 0"><span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;background:'+PIE_COLORS[idx%PIE_COLORS.length]+'"></span>'+esc(pr[0])+'</span><b>'+fmt(pr[1])+'　'+(pr[1]/tot*100).toFixed(1)+'%</b></div>';
+    });
+    if(pairs.length>6){
+      var rest=pairs.slice(6).reduce(function(sm,x){return sm+x[1];},0);
+      h+='<div class="row" style="justify-content:space-between"><span class="mut">其他 '+(pairs.length-6)+' 項</span><span class="mut">'+fmt(rest)+'</span></div>';
+    }
+    h+='</div></div>';
+  });
+  h+='</div>';
   return h;
 }
-function saveGoal(){
-  var v=+document.getElementById("goalAmt").value||0;
-  if(!S.goal) S.goal={};
-  S.goal[viewMonth.slice(0,4)]=v;
+function saveGoal(pid){
+  var el=document.getElementById("goalAmt_"+pid); if(!el)return;
+  if(!S.goal)S.goal={};
+  S.goal[pid]=+el.value||0;
   save(); render();
 }
-
 /* ================= 頁面 ================= */
 var PAGES=[{id:"dash",label:"總覽"},{id:"entry",label:"記帳"},{id:"list",label:"明細"},{id:"report",label:"分析"},{id:"budget",label:"預算"},{id:"asset",label:"資產"},{id:"aa",label:"AA結算"},{id:"data",label:"資料"}];
 var cur="dash";
