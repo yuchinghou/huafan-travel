@@ -243,61 +243,53 @@ function personSum(list,pid){
   return {inc:inc,exp:exp};
 }
 function pages_report(){
-  var mo=(document.getElementById("monthSel")||{}).value||viewMonth;
-  var months=rpRange();
-  if(!months.length)months=[viewMonth];
-  var startM=months[0], endM=months[months.length-1];
-  var list=S.txns.filter(function(t){var m2=(t.date||"").slice(0,7);return m2>=startM&&m2<=endM;});
-  var nm=months.length;
-  var h='<div class="card"><h2>分析儀表板</h2><div class="row">';
-  h+='<div class="f" style="max-width:170px"><label>月份</label><input type="month" id="monthSel" value="'+mo+'" onchange="render()"></div>';
-  h+='<div class="btnRow" style="margin:0">';
-  [["m","單月"],["y","該年全年"],["c","自訂區間"]].forEach(function(md){
-    h+='<button class="chip'+(rpMode===md[0]?" on":"")+'" onclick="setRpMode(\''+md[0]+'\')">'+md[1]+'</button>';
-  });
-  h+='</div>';
-  if(rpMode==="c"){
-    h+='<div class="f" style="max-width:150px"><label>起</label><input type="month" value="'+rpStart+'" onchange="rpStart=this.value;render()"></div>';
-    h+='<div class="f" style="max-width:150px"><label>迄</label><input type="month" value="'+rpEnd+'" onchange="rpEnd=this.value;render()"></div>';
-  }
-  h+='</div>';
-  h+='<div class="note">目前檢視：'+startM+' ~ '+endM+'（'+nm+' 個月），期間共 '+list.length+' 筆。</div></div>';
+  var years={};S.txns.forEach(function(t){var y=(t.date||"").slice(0,4);if(y)years[y]=1;});
+  var yk=Object.keys(years).sort();
+  var year=(yk.indexOf(rpYear)>=0)?rpYear:(yk.length?yk[yk.length-1]:viewMonth.slice(0,4));
+  var list=S.txns.filter(function(t){return (t.date||"").slice(0,4)===year;});
+  var h='<div class="card"><h2>財務分析儀表板（'+year+' 全年，不分月）</h2>';
+  if(yk.length>1){ h+='<div class="btnRow">'+yk.map(function(y){return '<button class="chip'+(y===year?" on":"")+'" onclick="rpYear='+y+';render()">'+y+'</button>';}).join("")+'</div>'; }
+  h+='<div class="note">口徑：計入支出＝一般支出＋旅遊支出；計入收入＝薪資＋獎金／現金；刷卡、繳卡、轉帳等只列明細不計入。本期間共 '+list.length+' 筆。</div></div>';
 
-  h+='<div class="card"><h2>存錢目標（每人各設，每月目標）</h2>';
-  h+='<div class="note">存錢＝該人本期計入收入 − 該人本期計入支出。選單月就是當月目標，選多月自動變成「每月目標 × 月數」的總目標。</div>';
+  /* ---- 存錢目標：當年所有收入−支出，不含開帳金額 ---- */
+  h+='<div class="card"><h2>存錢目標（每人各設・年度）</h2>';
+  h+='<div class="note">存到＝'+year+' 年你的計入收入 − 你的計入支出（跟開帳金額、資產無關）。</div>';
   h+='<div class="kpiGrid">';
   S.people.forEach(function(p){
     var s=personSum(list,p.id);
     var saved=s.inc-s.exp;
-    var per=+(((S.goal||{})[p.id])||0);
-    var goal=per*nm;
+    var goal=+(((S.goal||{})[p.id])||0);
     var pct=goal>0?Math.min(100,Math.round(saved/goal*100)):(saved>0?100:0);
     var col=(goal<=0)?"var(--mut)":(saved>=goal?"var(--ok)":(saved>=goal*0.8?"#d97706":"var(--bad)"));
-    h+='<div class="kpi"><div class="mut" style="font-size:12px">'+esc(p.name)+' 存錢</div>';
+    h+='<div class="kpi"><div class="mut" style="font-size:12px">'+esc(p.name)+' 今年存到</div>';
     h+='<div class="v" style="color:'+col+'">'+fmt(saved)+'</div>';
-    h+='<div class="s">'+(goal>0?("目標 "+fmt(goal)+"｜達成 "+pct+"%"+(saved<goal?("，還差 "+fmt(goal-saved)):"，達標 🎉")):"尚未設目標")+'</div>';
+    h+='<div class="s">收入 '+fmt(s.inc)+' − 支出 '+fmt(s.exp)+'</div>';
+    h+='<div class="s">'+(goal>0?("年度目標 "+fmt(goal)+"｜達成 "+pct+"%"+(saved<goal?("，還差 "+fmt(goal-saved)):"，達標 🎉")):"尚未設目標")+'</div>';
     if(goal>0){h+='<div style="background:var(--line);height:8px;border-radius:99px;margin-top:6px"><div style="width:'+pct+'%;height:8px;border-radius:99px;background:'+col+'"></div></div>';}
-    h+='<div class="row" style="margin-top:8px"><input class="f" style="max-width:130px" type="number" id="goalAmt_'+p.id+'" placeholder="每月目標" value="'+(per||"")+'"><button class="chip" onclick="saveGoal(\''+p.id+'\')">設定</button></div>';
+    h+='<div class="row" style="margin-top:8px"><input class="f" style="max-width:130px" type="number" id="goalAmt_'+p.id+'" placeholder="年度目標" value="'+(goal||"")+'"><button class="chip" onclick="saveGoal(\''+p.id+'\')">設定</button></div>';
     h+='</div>';
   });
   h+='</div>';
   if(S.people.some(function(p){var s2=personSum(list,p.id);return s2.exp>s2.inc;})){
-    h+='<div class="note" style="color:var(--bad)">⚠️ 有人本期花費比收入多（負存錢），看下方大項分布找原因。</div>';
+    h+='<div class="note" style="color:var(--bad)">⚠️ 有人今年花比賺多（負存錢），看下方大項分布找原因。</div>';
   }
   h+='</div>';
 
-  h+='<div class="card"><h2>花費比（本期，每人）</h2>';
+  /* ---- 兩人個別卡片（不合併計算） ---- */
   S.people.forEach(function(p){
     var s=personSum(list,p.id);
-    if(s.inc<=0){ h+='<div class="row"><b>'+esc(p.name)+'</b><span class="mut">本期無計入收入，無法算比例</span></div>'; return; }
-    var r=s.exp/s.inc*100;
-    var warn=r>100?["🔴 超支","var(--bad)"]:(r>=80?["⚠️ 達 80%","#d97706"]:["🟢 健康","var(--ok)"]);
-    h+='<div class="row" style="justify-content:space-between"><span><b>'+esc(p.name)+'</b>　收入 '+fmt(s.inc)+' − 支出 '+fmt(s.exp)+'</span><span style="color:'+warn[1]+'"><b>'+r.toFixed(1)+'%　'+warn[0]+'</b></span></div>';
-  });
-  h+='<div class="note">口徑：支出＝一般支出＋旅遊支出；收入＝薪資＋獎金/現金。</div></div>';
-
-  h+='<div class="card"><h2>本期大項分布（每人）</h2>';
-  S.people.forEach(function(p,pi){
+    h+='<div class="card" style="border-left:4px solid '+(p.id==="p1"?"var(--p1,#7c5cff)":"var(--p2,#10a37f)")+'"><h2 style="margin-top:0">'+esc(p.name)+'（僅'+esc(p.name)+'的帳）</h2>';
+    h+='<div class="kpiGrid">';
+    h+='<div class="kpi"><div class="mut" style="font-size:12px">'+year+' 計入收入</div><div class="v" style="color:var(--ok)">'+fmt(s.inc)+'</div></div>';
+    h+='<div class="kpi"><div class="mut" style="font-size:12px">'+year+' 計入支出</div><div class="v" style="color:var(--bad)">'+fmt(s.exp)+'</div></div>';
+    h+='<div class="kpi"><div class="mut" style="font-size:12px">存到（收−支）</div><div class="v" style="color:'+(s.inc-s.exp>=0?"var(--ok)":"var(--bad)")+'">'+fmt(s.inc-s.exp)+'</div></div>';
+    h+='<div class="kpi"><div class="mut" style="font-size:12px">花費率</div><div class="v">'+(s.inc>0?((s.inc?(s.exp/s.inc*100):0).toFixed(0)+'%'):"—")+'</div><div class="s">'+(s.inc>0?(s.exp/s.inc>1?"🔴 超支":(s.exp/s.inc>=0.8?"⚠️ 達80%":"🟢 健康")):"無計入收入")+'</div></div>';
+    h+='</div>';
+    /* AA 也分人顯示 */
+    var aaMine=0,aaOther=0;
+    list.forEach(function(t){ if(!t.aa||t.type!=="expense"||!isCounted(t))return; if(t.person===p.id)aaMine+=t.amount; else aaOther+=t.amount; });
+    h+='<div class="note" style="font-size:12px">共同分攤：你垫付應收回 <b style="color:var(--aa)">'+fmt(aaMine/2)+'</b>｜對方垫付你應補出 <b style="color:var(--aa)">'+fmt(aaOther/2)+'</b>｜淨額 '+(aaMine>=aaOther?"+":"−")+fmt(Math.abs((aaMine-aaOther)/2))+'</div>';
+    /* 本人大項圓餅 */
     var agg={};
     list.forEach(function(t){
       if(t.person!==p.id||t.type!=="expense"||S.cats.expense.indexOf(t.cat)<0)return;
@@ -306,27 +298,21 @@ function pages_report(){
     });
     var pairs=Object.keys(agg).map(function(k){return [k,agg[k]];}).sort(function(a,b){return b[1]-a[1];});
     var tot=pairs.reduce(function(sm,x){return sm+x[1];},0);
-    h+='<h3 style="margin:10px 0 4px">'+esc(p.name)+'　合計 '+fmt(tot)+'</h3>';
-    if(!pairs.length){h+='<div class="mut" style="margin-bottom:8px">本期無計入支出</div>';return;}
-    var acc=0,stops=[];
-    pairs.forEach(function(pr,idx){
-      var a0=acc/tot*360; acc+=pr[1];
-      stops.push(PIE_COLORS[idx%PIE_COLORS.length]+" "+a0.toFixed(2)+"deg "+(acc/tot*360).toFixed(2)+"deg");
-    });
-    h+='<div class="row" style="align-items:center"><div style="width:130px;height:130px;border-radius:50%;flex:none;background:conic-gradient('+stops.join(",")+')"></div>';
-    h+='<div style="flex:1;min-width:200px">';
-    pairs.slice(0,6).forEach(function(pr,idx){
-      h+='<div class="row" style="justify-content:space-between;padding:2px 0"><span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;background:'+PIE_COLORS[idx%PIE_COLORS.length]+'"></span>'+esc(pr[0])+'</span><b>'+fmt(pr[1])+'　'+(pr[1]/tot*100).toFixed(1)+'%</b></div>';
-    });
-    if(pairs.length>6){
-      var rest=pairs.slice(6).reduce(function(sm,x){return sm+x[1];},0);
-      h+='<div class="row" style="justify-content:space-between"><span class="mut">其他 '+(pairs.length-6)+' 項</span><span class="mut">'+fmt(rest)+'</span></div>';
-    }
-    h+='</div></div>';
+    if(tot){
+      var stops=[],acc=0;
+      pairs.forEach(function(pr,idx){ var a0=acc/tot*360; acc+=pr[1]; stops.push(PIE_COLORS[idx%PIE_COLORS.length]+" "+a0.toFixed(2)+"deg "+(acc/tot*360).toFixed(2)+"deg"); });
+      h+='<div class="row" style="align-items:center;margin-top:10px"><div style="width:120px;height:120px;border-radius:50%;flex:none;background:conic-gradient('+stops.join(",")+')"></div>';
+      h+='<div style="flex:1;min-width:180px">';
+      pairs.forEach(function(pr,idx){
+        h+='<div class="row" style="justify-content:space-between;padding:2px 0"><span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;background:'+PIE_COLORS[idx%PIE_COLORS.length]+'"></span>'+esc(pr[0])+'</span><b>'+fmt(pr[1])+'　'+(pr[1]/tot*100).toFixed(1)+'%</b></div>';
+      });
+      h+='</div></div>';
+    } else { h+='<p class="mut" style="font-size:13px">'+year+' 年無計入支出。</p>'; }
+    h+='</div>';
   });
-  h+='</div>';
   return h;
 }
+var rpYear="";
 function saveGoal(pid){
   var el=document.getElementById("goalAmt_"+pid); if(!el)return;
   if(!S.goal)S.goal={};
