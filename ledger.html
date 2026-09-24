@@ -69,6 +69,13 @@ footer{text-align:center;font-size:12px;color:var(--mut);margin-top:26px;line-he
   .f input,.f select{font-size:16px}
   .pills button{padding:6px 10px;font-size:12px}
 }
+
+/* v2.5 兩層分類按鈕: 縮小+配色 */
+#enTop,#enSub{flex-wrap:wrap;gap:6px}
+#enTop button,#enSub button{flex:0 0 auto;padding:5px 10px;font-size:12px;border-radius:999px;border-left:3px solid var(--cc,var(--line))}
+#enTop button.on,#enSub button.on{border-color:var(--cc,var(--acc));color:var(--cc,var(--acc));background:var(--ccb,rgba(108,140,255,.08))}
+.tscroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.tscroll table{min-width:680px}
 </style>
 </head>
 <body>
@@ -101,7 +108,7 @@ var TAG_TREE={
   "投資／資產配置":["股票買進","股票賣出","定期定額","股利／配息","投資手續費","投資損益","黃金／貴金屬","其他投資"],
   "資金往來":["家人匯款","家人還款","借款","還款","代墊","代墊收回","旅遊分攤","帳戶間轉帳"]
 };
-var TAG_ALIAS={"個人醫療":"醫療／保險","醫療":"醫療／保險","車費":"交通","旅遊相關費用":"旅遊","其他(非必要)":"娛樂／非必要","小賭怡情":"娛樂／非必要","生活開銷":"生活","工作花費":"工作","投資":"投資／資產配置","所得":"","信用卡費":""};
+var TAG_ALIAS={"個人醫療":"醫療／保險","醫療":"醫療／保險","車費":"交通","旅遊相關費用":"旅遊","其他(非必要)":"娛樂／非必要","小賭怡情":"娛樂／非必要","生活開銷":"生活","工作花費":"工作","投資":"投資／資產配置","所得":"","信用卡費":"資金往來"};
 function normTag(s){
   s=String(s||"").trim(); if(!s) return "";
   var segs=s.split("/"), top=segs[0];
@@ -228,7 +235,7 @@ function setRpMode(x){
 function personSum(list,pid){
   var inc=0,exp=0;
   list.forEach(function(t){
-    if(t.p!==pid||!t.cat)return;
+    if(t.person!==pid||!t.cat)return;
     if(t.type==="income"&&S.cats.income.indexOf(t.cat)>=0)inc+=t.amount;
     if(t.type==="expense"&&S.cats.expense.indexOf(t.cat)>=0)exp+=t.amount;
   });
@@ -293,7 +300,7 @@ function pages_report(){
     var agg={};
     list.forEach(function(t){
       if(t.person!==p.id||t.type!=="expense"||S.cats.expense.indexOf(t.cat)<0)return;
-      var tg=(t.tag||"未分類").split("/")[0];
+      var tg=(normTag(t.tag)||t.cat||"未分類").split("/")[0];
       agg[tg]=(agg[tg]||0)+t.amount;
     });
     var pairs=Object.keys(agg).map(function(k){return [k,agg[k]];}).sort(function(a,b){return b[1]-a[1];});
@@ -375,7 +382,7 @@ function pages_dash(){
   var topAgg={}, aggTot=0;
   list.forEach(function(t){
     if(!(t.type==="expense"&&isCounted(t))) return;
-    var g=normTag(t.tag||"")||"（未分類）", top=g.split("/")[0];
+    var g=normTag(t.tag||"")||t.cat||"（未分類）", top=g.split("/")[0];
     if(!topAgg[top]) topAgg[top]={amt:0,n:0,subs:{}};
     topAgg[top].amt+=t.amount; topAgg[top].n++;
     if(!topAgg[top].subs[g]) topAgg[top].subs[g]={amt:0,n:0,p:{}};
@@ -421,11 +428,12 @@ function pages_entry(){
   h+='</div></div></div>';
   h+='<div class="card" style="margin:12px 0;background:var(--soft,#f6f7fb)"><h2 style="margin-top:0">大項／細項（全部按鈕選）</h2>';
   h+='<div class="mut" style="font-size:12px;margin:-4px 0 8px">先按大項，細項按鈕才會出現；細項可按「（不選）＝只記大項」。這只是檢討用的標籤，不影響計入與總額。</div>';
-  h+='<div class="who" id="enTop">'+Object.keys(TAG_TREE).map(function(k){return '<button type="button" class="'+(pickTop===k?"on":"")+'" onclick="setTop(\''+esc(k)+'\')">'+esc(k)+'</button>';}).join("")+'</div>';
+  h+='<div class="who" id="enTop">'+Object.keys(TAG_TREE).map(function(k){var ci=Object.keys(TAG_TREE).indexOf(k)%PIE_COLORS.length;var c=PIE_COLORS[ci];return '<button type="button" class="'+(pickTop===k?"on":"")+'" style="--cc:'+c+';--ccb:'+c+'14" onclick="setTop(\''+esc(k)+'\')">'+esc(k)+'</button>';}).join("")+'</div>';
   h+='<div id="enSub" style="margin-top:8px">'+subRowHtml()+'</div></div>';
   h+='<div class="row"><div class="f"><label>備註（選填）</label><input id="enNote" placeholder="例：午餐、訂閱、出國機酒"></div>';
   h+='<div class="f" style="max-width:220px;display:flex;align-items:center;gap:8px;padding-top:18px"><input type="checkbox" id="enAA" style="width:20px;height:20px" '+(lastAA?"checked":"")+'><label for="enAA" style="margin:0">這筆應AA（'+(lastPerson?esc(personName(lastPerson)):"付款人")+'先墊，之後結算對半）</label></div></div>';
-  h+='<button class="btn" onclick="submitTxn()">保存這筆</button>';
+  h+='<div id="editBar" style="display:none;background:#fff7e6;border:1px solid #f0d9a8;border-radius:12px;padding:8px 12px;margin:0 0 10px;font-size:13px;color:#8a5b00;font-weight:700"></div>';
+  h+='<button class="btn" onclick="submitTxn()">'+(editId?"更新這筆":"保存這筆")+'</button>';
   h+='<div id="enMsg" style="display:inline-block;margin-left:12px;font-size:13px;color:var(--ok);font-weight:700"></div></div>';
   h+='<div class="card"><h2>計入口徑設定（可自行調整）</h2><div class="row">';
   h+='<div class="f"><label>計入「支出」的類別（逗號分隔）</label><input id="cfExp" value="'+esc(S.cats.expense.join(","))+'"></div>';
@@ -479,6 +487,29 @@ function saveCats(){
   if(d.length) S.cats.detail=d;
   save(); render();
 }
+function editTxn(id){
+  var t=null,idx=-1;
+  for(var i=0;i<S.txns.length;i++){ if(S.txns[i].id===id){ t=S.txns[i]; idx=i; break; } }
+  if(!t) return;
+  editId=id;
+  var tg=normTag(t.tag||""); var segs=tg?tg.split("/"):[];
+  pickTop=segs.length?segs[0]:null; pickSub=segs.length>1?segs.slice(1).join("/"):"";
+  lastPerson=t.person; lastAA=!!t.aa;
+  go("entry");
+  document.getElementById("enDate").value=t.date;
+  document.getElementById("enType").value=t.type;
+  catOpts();
+  document.getElementById("enCat").value=t.cat;
+  document.getElementById("enAmt").value=t.amount;
+  document.getElementById("enNote").value=t.note||"";
+  document.getElementById("enAA").checked=!!t.aa;
+  var ws=document.querySelectorAll("#enWho button");
+  for(var w=0;w<ws.length;w++) ws[w].className=(ws[w].getAttribute("data-id")===t.person?"on":"");
+  renderEntryTags();
+  var eb=document.getElementById("editBar"); if(eb){ eb.style.display=""; eb.innerHTML="✏️ 正在編輯："+esc(t.date)+" "+esc(t.cat)+" "+fmt(t.amount)+"　<a href=\"javascript:void(0)\" onclick=\"cancelEdit()\" style=\"color:var(--bad);font-weight:700\">取消編輯</a>"; }
+  window.scrollTo(0,0);
+}
+function cancelEdit(){ editId=null; var eb=document.getElementById("editBar"); if(eb) eb.style.display="none"; go("list"); }
 function submitTxn(){
   var date=document.getElementById("enDate").value;
   var amt=+document.getElementById("enAmt").value;
@@ -489,11 +520,17 @@ function submitTxn(){
   if(!who){ msg.textContent="請選付款人（分名字記帳）"; msg.style.color="var(--bad)"; return; }
   lastPerson=who.getAttribute("data-id");
   lastAA=document.getElementById("enAA").checked;
-  S.txns.unshift({id:"t"+Date.now()+"_"+Math.floor(Math.random()*1e4), date:date,
-    type:document.getElementById("enType").value, cat:document.getElementById("enCat").value,
-    amount:amt, person:lastPerson, aa:lastAA,
-    tag:curTag(),
-    note:document.getElementById("enNote").value.trim()});
+  var rec={date:date,type:document.getElementById("enType").value,cat:document.getElementById("enCat").value,
+    amount:amt,person:lastPerson,aa:lastAA,tag:curTag(),
+    note:document.getElementById("enNote").value.trim()};
+  if(editId){
+    for(var ei=0;ei<S.txns.length;ei++){ if(S.txns[ei].id===editId){ rec.id=editId; S.txns[ei]=rec; break; } }
+    editId=null;
+    var eb=document.getElementById("editBar"); if(eb) eb.style.display="none";
+  }else{
+    rec.id="t"+Date.now()+"_"+Math.floor(Math.random()*1e4);
+    S.txns.unshift(rec);
+  }
   save();
   msg.textContent=CS.on()?"✔ 已保存，同步中…":"✔ 已保存"; msg.style.color="var(--ok)";
   document.getElementById("enAmt").value=""; document.getElementById("enNote").value="";
@@ -515,15 +552,16 @@ function pages_list(){
     if(fltTop&&!(tg===fltTop||tg.indexOf(fltTop+"/")===0)) return false;
     if(fltSub&&tg!==fltSub) return false;
     return true; });
-  h+='<table><tr><th>日期</th><th>類別</th><th class="num">金額</th><th>付款人</th><th>口徑</th><th>細項</th><th>備註</th><th></th></tr>';
+  h+='<div class="tscroll"><table><tr><th>日期</th><th>類別</th><th class="num">金額</th><th>付款人</th><th>口徑</th><th>細項</th><th>備註</th><th></th></tr>';
   list.forEach(function(t){
     var tag=isCounted(t)?(t.type==="income"?'<span class="tag tg-in">計入收入</span>':'<span class="tag tg-out">計入支出</span>'):'<span class="tag tg-det">僅明細</span>';
-    h+='<tr><td>'+esc(t.date)+'</td><td>'+esc(t.cat)+'</td><td class="num">'+fmt(t.amount)+'</td><td><span class="tag tg-p">'+esc(personName(t.person))+'</span>'+(t.aa?' <span class="tag tg-aa">應AA・各分 '+fmt(t.amount/2)+'</span>':"")+'</td><td>'+tag+'</td><td>'+(t.tag?'<span class="tag" style="background:#eef1ff;color:#4a5fd0">'+esc(t.tag)+'</span>':'')+'</td><td class="mut" style="font-size:12px">'+esc(t.note)+'</td><td><button class="btn danger" style="padding:4px 10px;font-size:12px" onclick="delTxn(\''+t.id+'\')">刪</button></td></tr>';
+    h+='<tr><td>'+esc(t.date)+'</td><td>'+esc(t.cat)+'</td><td class="num">'+fmt(t.amount)+'</td><td><span class="tag tg-p">'+esc(personName(t.person))+'</span>'+(t.aa?' <span class="tag tg-aa">應AA・各分 '+fmt(t.amount/2)+'</span>':"")+'</td><td>'+tag+'</td><td>'+(t.tag?'<span class="tag" style="background:#eef1ff;color:#4a5fd0">'+esc(t.tag)+'</span>':'')+'</td><td class="mut" style="font-size:12px">'+esc(t.note)+'</td><td><button class="btn danger" style="padding:4px 10px;font-size:12px" onclick="delTxn(\''+t.id+'\')">刪</button> <button class="btn ghost" style="padding:4px 10px;font-size:12px" onclick="editTxn(\''+t.id+'\')">改</button></td></tr>';
   });
   if(!list.length) h+='<tr><td colspan="8" class="mut" style="text-align:center;padding:20px">這期間還沒有資料</td></tr>';
-  h+='</table><p class="mut" style="font-size:12px;margin-top:10px">共 '+list.length+' 筆。「僅明細」的類別不影響任何總額，只為查帳清楚。</p></div>';
+  h+='</table></div><p class="mut" style="font-size:12px;margin-top:10px">共 '+list.length+' 筆。「僅明細」的類別不影響任何總額，只為查帳清楚。</p></div>';
   return h;
 }
+var editId=null;
 var fltTop="", fltSub="";
 function selOpts(pairs,cur){ var s='<option value="">全部</option>'; pairs.forEach(function(p){ s+='<option value="'+esc(p[0])+'"'+(p[0]===cur?' selected':'')+'>'+esc(p[1])+'</option>'; }); return s; }
 function filterOpts(pairs){
