@@ -778,17 +778,26 @@ var CS = {
     var v=this.cfg;
     return '<div class="card"><h2>☁ 雲端同步（兩人共用這一個網頁）</h2>'+
       '<div class="syncstate" id="syncState">'+st+'</div>'+
-      '<div class="note">用法：本檔上傳到任一網頁空間（例：GitHub Pages），手機電腦都開同一條網址。<b>兩人在下面各貼一次 Repo＋Token，記帳就即時同步到同一個 Private Repo 的 data.json</b>——一邊記一筆，另一邊打開就是同一本帳。離線也能記，上線自動補同步。<br>Token 申請：GitHub → Settings → Developer settings → Fine-grained tokens，只勾帳本那一個 Repo、權限 Contents: Read and write。</div>'+
+      '<div class="note">用法：本檔上傳到任一網頁空間（例：GitHub Pages），手機電腦都開同一條網址。<b>兩人在下面各貼一次 Repo＋Token，記帳就即時同步到同一個 Private Repo 的 data.json</b>——一邊記一筆，另一邊打開就是同一本帳。離線也能記，上線自動補同步。<br>Token 申請：GitHub → Settings → Developer settings → Fine-grained tokens，只勾帳本那一個 Repo、權限 Contents: Read and write。<br><b>新裝置快速啟用：開啟本頁後，下方會出現一條「啟用同步連結」，把它複製到那台裝置的瀏覽器開啟即可，不用手打 token。</b></div>'+
       '<div class="row">'+
       '<div class="f"><label>Repo（帳號/庫名，例 yuchinghou/famledger）</label><input id="csRepo" placeholder="帳號/庫名" value="'+esc(v.repo||"")+'"></div>'+
       '<div class="f"><label>Token（Fine-grained PAT，只需 Contents 讀寫）</label><input id="csToken" type="password" placeholder="github_pat_…" value="'+esc(v.token||"")+'"></div>'+
       '<div class="f"><label>檔案路徑</label><input id="csFile" value="'+esc(v.file||"data.json")+'"></div>'+
       '</div>'+
+      '<div class="f" style="margin-top:10px"><label>新裝置啟用連結（複製後貼到該裝置瀏覽器開啟一次，即自動啟用同步）</label>'
+      +'<input readonly onclick="this.select()" value="'
+      +(v.token?location.origin+location.pathname+'?tok='+v.token:'（先在上方貼 Token 後產生）')+'"></div>'+
       '<button class="btn" onclick="CS.applyCfg()">儲存設定並立即同步</button> '+
       '<button class="btn ghost" onclick="CS.syncNow()">現在同步一次</button>'+
       '</div>';
   }
 };
+
+(function(){try{var m=location.search.match(/[?&]tok=([A-Za-z0-9_\.\-]+)/);
+if(m){CS.cfg.token=m[1];CS.cfg.repo=CS.cfg.repo||"yuchinghou/-";CS.cfg.file=CS.cfg.file||"data.json";
+localStorage.setItem(CS_CFG_KEY,JSON.stringify(CS.cfg));
+try{history.replaceState(null,"",location.pathname);}catch(e){}
+setTimeout(function(){CS.syncNow();},400);}}catch(e){}})();
 
 function render(){
   document.getElementById("nav").innerHTML=PAGES.map(function(p){return '<button class="'+(p.id===cur?"on":"")+'" onclick="go(\''+p.id+'\')">'+p.label+'</button>';}).join("");
